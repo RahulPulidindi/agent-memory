@@ -2,8 +2,8 @@
 
 CLI chat agent built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) with three cross-conversation memory strategies.
 
-> **Results:** See [`harness_output.txt`](./harness_output.txt) for the latest evaluation run.
-> **Write-up:** See [`WRITEUP.md`](./WRITEUP.md) for approach, trade-offs, and recommendation.
+- **Results:** See [`harness_output.txt`](./harness_output.txt) for the latest evaluation run.
+- **Write-up:** See [`WRITEUP.md`](./WRITEUP.md) for approach, trade-offs, and recommendation.
 
 ## Prerequisites
 
