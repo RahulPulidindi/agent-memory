@@ -19,3 +19,6 @@ build/
 
 # uv
 uv.lock
+
+# Memory databases
+*.db

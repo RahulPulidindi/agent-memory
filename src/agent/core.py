@@ -5,20 +5,30 @@ from deepagents import create_deep_agent
 def make_agent(
     model_str: str = "anthropic:claude-haiku-4-5-20251001",
     system_prompt: str | None = None,
+    memory_context: str | None = None,
 ):
-    """Create a deep agent with the specified model provider.
+    """Create a deep agent with the given model.
 
-    Args:
-        model_str: Provider and model in "provider:model" format.
-                   Examples: "openai:gpt-4o", "anthropic:claude-haiku-4-5-20251001",
-                   "google_genai:gemini-2.5-flash"
-        system_prompt: Optional system prompt override.
-
-    Returns:
-        A compiled LangGraph agent supporting .invoke(), .stream(), .astream().
+    model_str: "provider:model" format, e.g. "openai:gpt-4o".
+    memory_context: recalled context from prior conversations, prepended to the
+                    system prompt so the agent can reference it directly.
     """
     model = init_chat_model(model_str)
+
+    full_prompt: str | None = None
+    if memory_context:
+        base = system_prompt or ""
+        full_prompt = (
+            f"The following is verified memory from prior conversations with this user. "
+            f"Treat it as your own recall and use it confidently and directly in your answers:\n\n"
+            f"{memory_context}\n\n"
+            f"{base}".strip()
+        )
+    elif system_prompt:
+        full_prompt = system_prompt
+
     kwargs = {}
-    if system_prompt:
-        kwargs["system_prompt"] = system_prompt
+    if full_prompt:
+        kwargs["system_prompt"] = full_prompt
+
     return create_deep_agent(model=model, **kwargs)

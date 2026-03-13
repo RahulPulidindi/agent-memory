@@ -9,6 +9,7 @@ dependencies = [
     "langchain-openai",
     "langchain-anthropic",
     "langchain-google-genai",
+    "numpy",
     "python-dotenv",
 ]
 

@@ -1,69 +1,59 @@
 # take-home
 
-Barebones CLI chat agent built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents). Supports OpenAI, Anthropic, and Google models out of the box. Designed as a minimal starting point to build on.
+CLI chat agent built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) with three cross-conversation memory strategies.
+
+> **Results:** See [`harness_output.txt`](./harness_output.txt) for the latest evaluation run.
+> **Write-up:** See [`WRITEUP.md`](./WRITEUP.md) for approach, trade-offs, and recommendation.
 
 ## Prerequisites
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/) package manager
-- At least one LLM provider API key
+- `ANTHROPIC_API_KEY` — required for the default model and summary memory
+- `OPENAI_API_KEY` — required for semantic memory embeddings
 
-## Quick start
+## Setup
 
 ```bash
 git clone https://github.com/valkai-tech/take-home.git
 cd take-home
 uv sync
 cp .env.example .env
-# Fill in your API key(s) in .env
+# Add ANTHROPIC_API_KEY and OPENAI_API_KEY to .env
 ```
 
 ## Usage
 
 ```bash
-# Default model (Anthropic Claude Haiku — cheapest)
+# Stateless (no memory)
 uv run chat
 
-# OpenAI
-uv run chat --model openai:gpt-4o
+# With memory — pick a strategy and a user ID
+uv run chat --memory history --user alice
+uv run chat --memory summary --user alice
+uv run chat --memory semantic --user alice
 
-# Google
-uv run chat --model google_genai:gemini-2.5-flash
-
-# Custom system prompt
-uv run chat --system "You are a helpful coding assistant."
+# Custom model or system prompt
+uv run chat --model openai:gpt-4o --memory semantic --user alice
+uv run chat --system "You are a concise infrastructure advisor." --memory history --user alice
 ```
 
-Type `quit` or `exit` to end the session.
+Memory persists in `memory.db` between sessions. The same `--user` ID will load prior context on the next run. Type `quit` or `exit` to end a session.
 
-## Running evals
+## Evaluation harness
+
+Runs a scripted three-session scenario against all four strategies and scores each one on recall accuracy, token efficiency, and latency overhead.
+
+```bash
+uv run python -u -m evals.harness | tee harness_output.txt
+```
+
+The harness creates a temporary `harness_memory.db` and clears it before each run.
+
+## Tests
 
 ```bash
 uv run pytest evals/ -v
 ```
 
-Evals make real LLM calls (not mocked) to verify provider integration end-to-end.
-
-## Supported providers
-
-| Provider  | Model string example                          | Required env var       |
-|-----------|-----------------------------------------------|------------------------|
-| Anthropic | `anthropic:claude-haiku-4-5-20251001` (default) | `ANTHROPIC_API_KEY`    |
-| OpenAI    | `openai:gpt-4o`                               | `OPENAI_API_KEY`       |
-| Google    | `google_genai:gemini-2.5-flash`               | `GOOGLE_API_KEY`       |
-
-Any model supported by LangChain's [`init_chat_model`](https://docs.langchain.com/oss/python/langchain/models) works — just pass the `provider:model` string.
-
-## Project structure
-
-```
-take-home/
-├── pyproject.toml          # uv project config, dependencies
-├── .env.example            # API key template
-├── src/
-│   └── agent/
-│       ├── core.py         # Agent factory (create_deep_agent wrapper)
-│       └── cli.py          # Interactive chat REPL (entry point)
-└── evals/
-    └── test_agent.py       # Barebones pytest evals
-```
+Tests make real LLM API calls. Both API keys are required.
