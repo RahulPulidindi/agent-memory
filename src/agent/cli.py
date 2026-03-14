@@ -23,7 +23,7 @@ def main():
     parser.add_argument(
         "--memory",
         default="none",
-        choices=["none", "history", "summary", "semantic"],
+        choices=["none", "history", "summary", "semantic", "agentic"],
         help="Cross-conversation memory strategy (default: none)",
     )
     parser.add_argument(

@@ -1,6 +1,6 @@
 # take-home
 
-CLI chat agent built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) with three cross-conversation memory strategies.
+CLI chat agent built on [LangChain Deep Agents](https://github.com/langchain-ai/deepagents) with four cross-conversation memory strategies.
 
 - **Results:** See [`harness_output.txt`](./harness_output.txt) for the latest evaluation run.
 - **Write-up:** See [`WRITEUP.md`](./WRITEUP.md) for approach, trade-offs, and recommendation.
@@ -32,6 +32,7 @@ uv run chat
 uv run chat --memory history --user alice
 uv run chat --memory summary --user alice
 uv run chat --memory semantic --user alice
+uv run chat --memory agentic --user alice
 
 # Custom model or system prompt
 uv run chat --model openai:gpt-4o --memory semantic --user alice
@@ -42,7 +43,7 @@ Memory persists in `memory.db` between sessions. The same `--user` ID will load 
 
 ## Evaluation harness
 
-Runs a scripted three-session scenario against all four strategies and scores each one on recall accuracy, token efficiency, and latency overhead.
+Runs a scripted three-session scenario against all five strategies and scores each one on recall accuracy, token efficiency, and latency overhead.
 
 ```bash
 uv run python -u -m evals.harness | tee harness_output.txt

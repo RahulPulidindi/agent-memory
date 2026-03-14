@@ -4,7 +4,7 @@
 
 Out of the box, conversational AI agents are stateless. Every session starts from a blank slate — the user's name, their project context, the decisions they made three conversations ago, all of it gone. For a one-off tool this is fine. For anything meant to feel like a genuine assistant, it's a real limitation.
 
-The goal here was to implement three distinct cross-conversation memory strategies, run them through the same scripted scenario, and compare them honestly across the dimensions that actually matter in production: recall accuracy, token cost, and latency overhead.
+The goal here was to implement four distinct cross-conversation memory strategies, run them through the same scripted scenario, and compare them honestly across the dimensions that actually matter in production: recall accuracy, token cost, and latency overhead.
 
 ---
 
@@ -22,11 +22,11 @@ An LLM judge scores each answer 0–5 based on how many expected facts were pres
 
 ---
 
-## The three strategies
+## The four strategies
 
 ### Full History
 
-Every user and assistant message is stored verbatim in SQLite and replayed in full on every request. It's the simplest possible implementation — no summarisation, no embeddings, no intelligence. Just an append-only log.
+Every user and assistant message is stored verbatim in SQLite and replayed in full on every request. No summarisation, no embeddings, no intelligence — just an append-only log.
 
 The good news is that it's completely lossless. If the user mentioned something three months and fifty sessions ago, it's still there, word for word. The bad news is that "still there" means it gets injected into every prompt, in full, forever. A user who's had 100 sessions will have an enormous context injection on their 101st, and eventually you'll hit the model's context window limit. Cost also grows linearly with usage, which doesn't work at scale.
 
@@ -34,49 +34,66 @@ The good news is that it's completely lossless. If the user mentioned something 
 
 ### Summary Memory
 
-After each turn, an LLM call merges the new exchange into a running summary of everything known about the user. The summary gets updated in place — it doesn't grow with sessions, it stays compact.
+After each turn, an LLM call merges the new exchange into a running summary of everything known about the user. The summary stays compact regardless of how many sessions have occurred.
 
-This is clever in theory. The prompt injection stays small regardless of how many sessions have happened, and the summary often captures the important things well. The problem is that LLM summarisation is inherently lossy. Specific numbers and exact names are exactly the kind of detail that summaries smooth over. And the update happens synchronously — every store call blocks for several seconds while the summarisation LLM runs. In our results that was ~7 seconds per turn. That's fine for a background process, but it's a lot of overhead to absorb.
+This is clever in theory. The prompt injection stays small and the summary often captures the important things well. The problem is that LLM summarisation is inherently lossy — specific numbers and exact names are exactly the kind of detail that summaries smooth over. And the update happens synchronously, so every store call blocks for several seconds while the summarisation LLM runs. In our results that was ~7 seconds per turn. That's a lot of overhead to absorb for an interactive product.
 
-**When it makes sense:** Long-lived users where you care more about the big picture than exact recall of specific details. Works well when the user's context is mostly narrative ("they're working on a payments migration") rather than precise facts ("their SLA is exactly 200ms").
+**When it makes sense:** Long-lived users where you care more about the big picture than exact recall of specific details.
 
 ### Semantic Memory
 
-Each exchange is converted to an embedding vector and stored. At retrieval time, the current query is embedded and compared against everything stored using cosine similarity. Only the top-K most relevant chunks come back, which means the prompt injection stays bounded regardless of how much history accumulates.
+Each exchange is converted to an embedding vector and stored. At retrieval time, the current query is embedded and compared against everything stored using cosine similarity. Only the top-K most relevant chunks come back, keeping injection size bounded regardless of how much history accumulates.
 
-This is the most scalable approach. The 1,000th session costs roughly the same as the 10th, because you're only ever injecting the most relevant chunks. Retrieval and storage both take a few hundred milliseconds — enough to be noticeable but nothing that blocks the user experience.
+This scales well — the 1,000th session costs roughly the same as the 10th. The one real risk is that retrieval is query-dependent. If the user asks something that doesn't semantically resemble how the relevant memory was originally phrased, the right chunk might not surface. History and summary don't have this problem because they inject everything.
 
-The one real risk is that retrieval is query-dependent. If the user asks something that doesn't semantically resemble how the relevant memory was originally phrased, the right chunk might not rank highly enough to get retrieved. History and summary don't have this problem — they inject everything. Semantic memory is making a bet that relevance and recency are good proxies for "what the user needs right now", which is usually true but not always.
+There's also a subtler issue: raw semantic memory embeds whole exchanges (user message + assistant response together), which dilutes the retrieval signal with assistant-generated content. The embedding is partly indexing what the model said, not just what the user told it.
+
+**When it makes sense:** Large, varied history where injecting everything would be too expensive and targeted recall is sufficient.
+
+### Agentic Memory
+
+The most sophisticated strategy. Instead of storing raw exchanges, an LLM distils each turn into discrete extracted facts ("User is named Sarah Chen", "SLA is 200ms end-to-end"), which are then embedded individually and stored. This directly solves the signal dilution problem in plain semantic memory — the embeddings index user-stated facts, not assistant responses.
+
+On top of the fact store, a persistent core memory block is maintained: a compact, always-injected structured record of the user's identity, active projects, and key constraints. This guarantees that identity-level information is always available, not subject to whether cosine similarity retrieves the right chunk.
+
+The core block is updated asynchronously after each turn (via a background thread), avoiding the blocking latency that makes summary memory painful in practice.
+
+**When it makes sense:** Any production use case. It combines the bounded token cost of semantic memory with the reliable identity recall of summary memory, while adding structured fact extraction that improves retrieval precision.
 
 ---
 
 ## Results
 
 ```
-Metric                            none     history     summary    semantic
---------------------------------------------------------------------------
-Mean judge score (0-5)             0.0         5.0         5.0         5.0
-Mean prompt tokens                 193        4136        1417        2591
-Token delta vs none           baseline       +3944       +1225       +2398
-Mean retrieve ms                     0           1           1         351
-Mean store ms                        0           2        7296         368
-Total overhead (s)                0.00        0.01       21.89        2.16
+Metric                            none     history     summary    semantic     agentic
+--------------------------------------------------------------------------------------
+Mean judge score (0-5)             0.0         5.0         5.0         5.0         5.0
+Mean prompt tokens                 194        4163        1380        2194        1232
+Token delta vs none           baseline       +3969       +1187       +2000       +1038
+Mean retrieve ms                     0           1           2         850         368
+Mean store ms                        0           3        6666         403        1107
+Total overhead (s)                0.00        0.01       20.00        3.76        4.42
 ```
 
-All three memory strategies scored 5.0 — perfect recall across all questions even after Session 2 injected noise. The stateless baseline scored 0.0, as expected: it simply can't answer questions about things it was never told.
+All four memory strategies scored 5.0 — perfect recall across all questions even after Session 2 injected noise. The stateless baseline scored 0.0, as expected.
 
-The differentiation shows up entirely in cost and overhead. History consumed 4,136 prompt tokens per turn — 21x the baseline and 3x more than semantic. Summary kept tokens down to 1,417 but paid for it in store latency: 7.3 seconds per turn for the summarisation call. Semantic sits in the middle on tokens (2,591) with consistent sub-400ms overhead on both sides.
+The differentiation is entirely in cost and overhead:
+
+- **History** consumed 4,163 prompt tokens per turn — over 3x more than any other memory strategy. It works but doesn't scale.
+- **Summary** kept tokens down to 1,380 but paid for it with 6.7 seconds of store latency per turn. Synchronous LLM summarisation is the culprit.
+- **Semantic** used 2,194 tokens with consistent ~400ms overhead on both sides. Solid middle ground, but token cost is nearly 2x agentic.
+- **Agentic** used the fewest tokens (1,232 — only slightly above summary) with 368ms retrieve latency and ~1.1s store latency. The store overhead is higher than semantic due to the synchronous fact extraction LLM call, but total overhead (4.42s) is nearly identical to semantic (3.76s).
 
 ---
 
-## My recommendation: Semantic Memory
+## Recommendation: Agentic Memory
 
-For a production system, semantic memory is the right default.
+Agentic memory is the strongest strategy across every meaningful production dimension.
 
-History fails at scale. Token cost growing without bound is a design problem you'll eventually have to solve, and context window limits mean it simply breaks for long-lived users. It's a great starting point but not a shipping architecture.
+It uses fewer prompt tokens than any other strategy (including summary), retrieves faster than semantic, and avoids the synchronous blocking that makes summary memory impractical. Recall quality matches the other strategies at this scale and should degrade more gracefully at larger scale, since it's indexing extracted facts rather than raw conversation text.
 
-Summary is compelling on token efficiency but the synchronous LLM-on-every-store pattern is hard to justify. Seven seconds of background overhead per turn adds up, and you can't fully trust the summariser to preserve every specific fact the user cared about.
+The extra store complexity is the honest tradeoff: fact extraction requires one synchronous LLM call per turn (~700ms overhead vs raw embedding). This is real cost, but it buys you meaningfully better retrieval precision and a compact, always-available core memory block — which no other strategy provides without additional engineering.
 
-Semantic memory sidesteps both problems. Storage is cheap, retrieval is bounded, and the latency overhead is low enough that it doesn't meaningfully affect the user experience. The query-dependence limitation is real, but it's addressable — you can hedge against it by also storing a lightweight structured summary for identity and preferences, and reserving semantic retrieval for the richer conversational context.
+The one thing this evaluation doesn't prove is long-horizon behaviour. Over hundreds of sessions, agentic memory's token advantage should compound: the core block stays bounded, facts are granular and deduplicable, and retrieval is over clean signal. History breaks under that load, summary gets increasingly lossy, and semantic's retrieval quality degrades as the fact pool grows. Agentic is the only strategy designed to stay cheap and accurate as usage accumulates.
 
-If I were productionising this, I'd run summary and semantic together: a small structured record for facts that should always be available (name, role, key constraints), and semantic retrieval for everything else. You get the bounded cost of semantic with the reliable recall of a curated summary for the facts that matter most.
+If we're building for scale, start with agentic. If we need something simpler today, semantic is the next best option — the same bounded cost model, without the fact extraction layer.

@@ -2,7 +2,7 @@
   Memory Strategy Evaluation Harness
   Model: anthropic:claude-haiku-4-5-20251001
   Judge: anthropic:claude-haiku-4-5-20251001
-  Strategies: none, history, summary, semantic
+  Strategies: none, history, summary, semantic, agentic
 ========================================================================
 
 [none] Skipping accumulation sessions (stateless baseline).
@@ -24,40 +24,40 @@
 [semantic] Session 3: testing recall of Session 1 facts...
 [semantic] Done. Mean judge score: 5.0/5
 
+[agentic] Session 1: planting initial facts...
+[agentic] Session 2: injecting dilution noise...
+[agentic] Session 3: testing recall of Session 1 facts...
+[agentic] Done. Mean judge score: 5.0/5
+
 ========================================================================
   Strategy: NONE
 ========================================================================
 
 Session 3, Turn 1: "Recall of user identity after memory dilution by Session 2"
   Q: Going back to basics — what's my name, role, and company?
-  A: I don't have any memory of prior conversations with you. This appears to be the start of our conversation, and there's no memory section provided in your message that would contain information about your name, role, or company.
+  A: I don't have any prior conversation memory provided in this prompt, so I don't have information about your name, role, or company.
 
-Could you tell me those details? That way I can help you more effective...
-  Judge:   0/5  --  The response contains a refusal ("I don't have any memory of prior conversations") which triggers RULE 1 — INSTANT ZERO, regardless of whether the expected facts were available to recall.
-  Tokens:  88 prompt / 67 completion
+If you'd like to share those details, I'm happy to use them in our conversation. Or if you have a previous conversation transcript you'd like me to reference, feel free...
+  Judge:   0/5  --  The response contains a hedge/refusal ("I don't have any prior conversation memory provided in this prompt, so I don't have information about..."), which triggers RULE 1 for an instant zero score. No expected facts (Sarah Chen, principal engineer, Meridian Financial) are present.
+  Tokens:  88 prompt / 80 completion
   Latency: retrieve 0ms | store 0ms
 
 Session 3, Turn 2: "Recall of LedgerSync name and Avro format after Session 2 noise"
   Q: Remind me: what's the internal name of the reconciliation service and what's its audit event serialization format?
-  A: I don't have any prior conversation history with you, so I can't recall those details about your reconciliation service or its audit event serialization format.
+  A: I don't have any prior conversation memory provided in this prompt, so I don't have information about your reconciliation service's internal name or its audit event serialization format.
 
-If you have a memory section from a previous conversation that contains this information, please include it in your prompt and I'll refere...
-  Judge:   0/5  --  The response contains a refusal ("I don't have any prior conversation history with you, so I can't recall those details"), which triggers RULE 1 (INSTANT ZERO). No expected facts are present.
-  Tokens:  182 prompt / 110 completion
+If you've discussed these technical details in a previous conversation, you could share that context with me and...
+  Judge:   0/5  --  The response contains a hedge/refusal ("I don't have any prior conversation memory provided in this prompt", "I don't have information about"), triggering RULE 1 — instant zero. Neither expected fact (LedgerSync, Apache Avro) was provided.
+  Tokens:  195 prompt / 87 completion
   Latency: retrieve 0ms | store 0ms
 
 Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
   Q: What was our agreed reconciliation SLA and rollback window?
-  A: I don't have any record of previous conversations with you, so I'm not aware of any agreed reconciliation SLA or rollback window.
+  A: I don't have any prior conversation memory provided in this prompt, so I don't have information about an agreed reconciliation SLA or rollback window.
 
-To help you effectively, I'd need you to provide:
-
-1. The reconciliation SLA (Service Level Agreement) you're working with
-2. The rollback window parameters
-
-If you have...
-  Judge:   0/5  --  The response contains a refusal ("I don't have any record of previous conversations with you", "I'm not aware of any agreed reconciliation SLA or rollback window"), triggering RULE 1 — instant zero regardless of whether the expected facts ("200ms", "48-hour") are present.
-  Tokens:  308 prompt / 126 completion
+If these were discussed previously, you'd need to share that context with me. Feel free to provide those details and I can help you work with them g...
+  Judge:   0/5  --  Response contains a hedge/refusal ("I don't have any prior conversation memory", "I don't have information about"), triggering RULE 1 — instant zero regardless of whether the expected facts (200ms SLA and 48-hour rollback window) are known.
+  Tokens:  298 prompt / 68 completion
   Latency: retrieve 0ms | store 0ms
 
 ========================================================================
@@ -66,26 +66,28 @@ If you have...
 
 Session 3, Turn 1: "Recall of user identity after memory dilution by Session 2"
   Q: Going back to basics — what's my name, role, and company?
-  A: You're Sarah Chen, principal engineer on the Core Payments Platform team at Meridian Financial. You're leading the migration from a monolithic Ruby on Rails payment processor to a Python-based microservices architecture.
-  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "principal engineer" (role), and "Meridian Financial" (company). The assistant also provides additional accurate context about the team and project without contradicting any expected facts.
-  Tokens:  4002 prompt / 47 completion
-  Latency: retrieve 1ms | store 2ms
+  A: You're **Sarah Chen**, principal engineer on the Core Payments Platform team at **Meridian Financial**. You're leading the migration from a monolithic Ruby on Rails payment processor to a Python-based microservices architecture on GKE.
+  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "principal engineer" (role), and "Meridian Financial" (company) — with additional contextual details about the team and project that do not detract from the score.
+  Tokens:  4004 prompt / 54 completion
+  Latency: retrieve 1ms | store 4ms
 
 Session 3, Turn 2: "Recall of LedgerSync name and Avro format after Session 2 noise"
   Q: Remind me: what's the internal name of the reconciliation service and what's its audit event serialization format?
-  A: The reconciliation service is called **LedgerSync**, and you've standardized on **Apache Avro** for schema enforcement across all audit events in your event sourcing approach.
-  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format with appropriate context about schema enforcement.
-  Tokens:  4141 prompt / 41 completion
+  A: The reconciliation service is called **LedgerSync**, and you've decided to use **Apache Avro** for schema enforcement across all audit events.
+
+You're also implementing event sourcing for the audit trail, which pairs with the Avro schema to enforce consistency as events evolve.
+  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format. The assistant also provides accurate supporting context about event sourcing.
+  Tokens:  4157 prompt / 64 completion
   Latency: retrieve 1ms | store 2ms
 
 Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
   Q: What was our agreed reconciliation SLA and rollback window?
   A: Your end-to-end SLA for the reconciliation pipeline is **200ms**, and you've committed to a **48-hour rollback window** if LedgerSync has production issues.
 
-That said, I flagged some concerns about that rollback window earlier — specifically around whether you can functionally revert to the monolit...
-  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated; additional context about concerns and recommendations does not reduce the score.
-  Tokens:  4266 prompt / 126 completion
-  Latency: retrieve 1ms | store 2ms
+You also have a hard cutover deadline at the end of Q3.
+  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated; additional context about Q3 cutover does not reduce the score.
+  Tokens:  4328 prompt / 60 completion
+  Latency: retrieve 1ms | store 3ms
 
 ========================================================================
   Strategy: SUMMARY
@@ -93,24 +95,28 @@ That said, I flagged some concerns about that rollback window earlier — specif
 
 Session 3, Turn 1: "Recall of user identity after memory dilution by Session 2"
   Q: Going back to basics — what's my name, role, and company?
-  A: You're **Sarah Chen**, Principal Engineer on the Core Payments Platform team at **Meridian Financial**. You're leading the migration from a monolithic Ruby on Rails payment processor to a Python-based microservices architecture.
-  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "Principal Engineer" (role), and "Meridian Financial" (company). The assistant also provided additional accurate context about the team and project without hedging or refusing to recall.
-  Tokens:  1346 prompt / 50 completion
-  Latency: retrieve 1ms | store 7156ms
+  A: You're **Sarah Chen**, a **Principal Engineer** on the **Core Payments Platform team** at **Meridian Financial**.
+
+You're leading the migration of the company's monolithic Ruby on Rails payment processor to a Python-based microservices architecture, with a hard cutover deadline at the end of Q3.
+  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "Principal Engineer" (role), and "Meridian Financial" (company). The additional context about the Core Payments Platform team and Q3 cutover does not reduce the score.
+  Tokens:  1286 prompt / 70 completion
+  Latency: retrieve 2ms | store 6317ms
 
 Session 3, Turn 2: "Recall of LedgerSync name and Avro format after Session 2 noise"
   Q: Remind me: what's the internal name of the reconciliation service and what's its audit event serialization format?
-  A: The reconciliation service is **LedgerSync**, and it's using **Apache Avro** for schema enforcement on the audit event emission to Kafka.
-  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format with appropriate context about schema enforcement.
-  Tokens:  1423 prompt / 36 completion
-  Latency: retrieve 1ms | store 7281ms
+  A: The reconciliation service is **LedgerSync**, and it's using **Apache Avro** for schema enforcement on the audit events it emits to Kafka.
+
+You're considering the transactional outbox pattern to ensure event reliability alongside the event sourcing strategy.
+  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format. The volunteer context about the transactional outbox pattern does not reduce the score.
+  Tokens:  1383 prompt / 60 completion
+  Latency: retrieve 2ms | store 6652ms
 
 Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
   Q: What was our agreed reconciliation SLA and rollback window?
-  A: The end-to-end SLA for the reconciliation pipeline is **200ms**, and you've committed to a **48-hour rollback window** for any LedgerSync production issues.
-  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated in the response.
-  Tokens:  1483 prompt / 44 completion
-  Latency: retrieve 1ms | store 7451ms
+  A: Your end-to-end SLA for the reconciliation pipeline is **200ms**, and you have a committed **48-hour rollback window** if things go wrong post-cutover.
+  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated.
+  Tokens:  1472 prompt / 43 completion
+  Latency: retrieve 1ms | store 7031ms
 
 ========================================================================
   Strategy: SEMANTIC
@@ -118,38 +124,61 @@ Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
 
 Session 3, Turn 1: "Recall of user identity after memory dilution by Session 2"
   Q: Going back to basics — what's my name, role, and company?
-  A: You're **Sarah Chen**, principal engineer on the **Core Payments Platform team** at **Meridian Financial**. You're leading the migration from a monolithic Ruby on Rails payment processor to a Python-based microservices architecture.
-  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "principal engineer" (role), and "Meridian Financial" (company). The assistant also provided additional accurate context about the team and project without hedging or refusing to recall.
-  Tokens:  2446 prompt / 52 completion
-  Latency: retrieve 458ms | store 463ms
+  A: You're Sarah Chen, principal engineer on the Core Payments Platform team at Meridian Financial. You're leading the migration from a monolithic Ruby on Rails payment processor to a Python-based microservices architecture.
+  Judge:   5/5  --  All three expected facts are present and accurate — "Sarah Chen" (name), "principal engineer" (role), and "Meridian Financial" (company). The assistant also provides additional accurate context about the team and project without contradicting any expected facts.
+  Tokens:  2136 prompt / 47 completion
+  Latency: retrieve 1102ms | store 495ms
 
 Session 3, Turn 2: "Recall of LedgerSync name and Avro format after Session 2 noise"
   Q: Remind me: what's the internal name of the reconciliation service and what's its audit event serialization format?
-  A: The reconciliation service is internally called **LedgerSync**, and you've decided to use **Apache Avro** for schema enforcement across all audit events.
-
-You're implementing this with event sourcing for the audit trail, with a hard cutover deadline at end of Q3 and a committed 48-hour rollback wind...
-  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format. The assistant also provides additional accurate context from the prior sessions without introducing errors.
-  Tokens:  2732 prompt / 81 completion
-  Latency: retrieve 325ms | store 335ms
+  A: The reconciliation service is internally called **LedgerSync**, and you're using **Apache Avro** for schema enforcement across all audit events.
+  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format.
+  Tokens:  2323 prompt / 34 completion
+  Latency: retrieve 528ms | store 382ms
 
 Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
   Q: What was our agreed reconciliation SLA and rollback window?
-  A: Your reconciliation service has an end-to-end SLA of **200ms**, and you've committed to a **48-hour rollback window** if LedgerSync encounters production issues.
+  A: Your end-to-end SLA for the reconciliation pipeline is **200ms**, and you've committed to a **48-hour rollback window** if LedgerSync has production issues.
 
-That 48-hour window is tight given the event sourcing + Avro schema enforcement complexity you're adding—it's something worth stress-test...
-  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated; additional context about event sourcing and stress-testing does not reduce the score.
-  Tokens:  2595 prompt / 89 completion
-  Latency: retrieve 268ms | store 306ms
+You also have a hard cutover deadline at the end of Q3, with the plan to use event sourcing for the audit trail with Apache Avro for schema en...
+  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated; additional context about Q3 cutover and event sourcing does not reduce the score.
+  Tokens:  2123 prompt / 85 completion
+  Latency: retrieve 921ms | store 333ms
+
+========================================================================
+  Strategy: AGENTIC
+========================================================================
+
+Session 3, Turn 1: "Recall of user identity after memory dilution by Session 2"
+  Q: Going back to basics — what's my name, role, and company?
+  A: You're **Sarah Chen**, Principal Engineer on the Core Payments Platform team at **Meridian Financial**.
+  Judge:   5/5  --  All three expected facts are present and accurate: "Sarah Chen" (name), "Principal Engineer" (role), and "Meridian Financial" (company). The assistant also correctly included additional context about the team affiliation, which does not reduce the score.
+  Tokens:  1165 prompt / 25 completion
+  Latency: retrieve 409ms | store 1780ms
+
+Session 3, Turn 2: "Recall of LedgerSync name and Avro format after Session 2 noise"
+  Q: Remind me: what's the internal name of the reconciliation service and what's its audit event serialization format?
+  A: The reconciliation service is **LedgerSync**, and it uses **Apache Avro** for schema enforcement on audit events emitted to the Kafka cluster.
+  Judge:   5/5  --  Both expected facts are present and accurate — "LedgerSync" is correctly identified as the reconciliation service name, and "Apache Avro" is correctly stated as the audit event serialization format with appropriate context about schema enforcement.
+  Tokens:  1240 prompt / 37 completion
+  Latency: retrieve 333ms | store 406ms
+
+Session 3, Turn 3: "Recall of SLA and rollback window after Session 2 dilution"
+  Q: What was our agreed reconciliation SLA and rollback window?
+  A: Your reconciliation pipeline has a **200ms end-to-end SLA**, and you've committed to a **48-hour rollback window** if LedgerSync encounters production issues.
+  Judge:   5/5  --  Both expected facts are present and accurate — "200ms" reconciliation SLA and "48-hour" rollback window are correctly stated in the response.
+  Tokens:  1291 prompt / 43 completion
+  Latency: retrieve 362ms | store 1134ms
 
 ========================================================================
   SUMMARY COMPARISON
 ========================================================================
-Metric                            none     history     summary    semantic
---------------------------------------------------------------------------
-Mean judge score (0-5)             0.0         5.0         5.0         5.0
-Mean prompt tokens                 193        4136        1417        2591
-Token delta vs none           baseline       +3944       +1225       +2398
-Mean retrieve ms                     0           1           1         351
-Mean store ms                        0           2        7296         368
-Total overhead (s)                0.00        0.01       21.89        2.16
+Metric                            none     history     summary    semantic     agentic
+--------------------------------------------------------------------------------------
+Mean judge score (0-5)             0.0         5.0         5.0         5.0         5.0
+Mean prompt tokens                 194        4163        1380        2194        1232
+Token delta vs none           baseline       +3969       +1187       +2000       +1038
+Mean retrieve ms                     0           1           2         850         368
+Mean store ms                        0           3        6666         403        1107
+Total overhead (s)                0.00        0.01       20.00        3.76        4.42
 

@@ -5,7 +5,7 @@ import pytest
 from dotenv import load_dotenv
 
 from agent.core import make_agent
-from agent.memory import FullHistoryMemory, SemanticMemory, SummaryMemory, get_memory_strategy
+from agent.memory import AgenticMemory, FullHistoryMemory, SemanticMemory, SummaryMemory, get_memory_strategy
 
 load_dotenv()
 
@@ -232,3 +232,113 @@ class TestMemoryFactory:
     def test_factory_invalid(self):
         with pytest.raises(ValueError, match="Unknown memory strategy"):
             get_memory_strategy("nonexistent")
+
+    def test_factory_agentic(self, tmp_db):
+        s = get_memory_strategy("agentic", db_path=tmp_db)
+        assert isinstance(s, AgenticMemory)
+
+
+# ---------------------------------------------------------------------------
+# Agentic memory tests
+# ---------------------------------------------------------------------------
+
+
+def _run_session_1_agentic(strategy, user_id: str, model_str: str) -> None:
+    """Plant facts via agentic memory, waiting for async core updates."""
+    messages = []
+    turns = [
+        "My name is Jordan. I'm a staff engineer at Meridian Labs.",
+        "Our team works in Python exclusively. We use FastAPI for our services and deploy to GCP.",
+    ]
+    for turn in turns:
+        agent = make_agent(model_str)
+        messages.append({"role": "user", "content": turn})
+        result = agent.invoke({"messages": messages})
+        messages = result["messages"]
+        ai_content = messages[-1].content
+        strategy.store(user_id, [
+            {"role": "user", "content": turn},
+            {"role": "assistant", "content": ai_content},
+        ])
+        strategy.wait_for_core_update()
+
+
+class TestAgenticMemory:
+    def test_recalls_name_across_sessions(self, tmp_db):
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        response = _run_session_2_question(
+            strategy, USER, "What is my name?", MODEL
+        )
+        assert "Jordan" in response
+
+    def test_recalls_company_across_sessions(self, tmp_db):
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        response = _run_session_2_question(
+            strategy, USER, "What company do I work at?", MODEL
+        )
+        assert "Meridian" in response
+
+    def test_recalls_tech_stack_across_sessions(self, tmp_db):
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        response = _run_session_2_question(
+            strategy, USER, "What programming language and framework does my team use?", MODEL
+        )
+        assert "Python" in response or "FastAPI" in response
+
+    def test_extracts_structured_facts(self, tmp_db):
+        """Facts should be stored as discrete extracted statements, not raw turns."""
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        import sqlite3
+        conn = sqlite3.connect(tmp_db)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT fact FROM agentic_facts WHERE user_id = ?", (USER,)
+        ).fetchall()
+        conn.close()
+
+        facts = [row["fact"] for row in rows]
+        assert len(facts) > 0
+        # Facts should be concise extractions, not full conversation turns
+        for fact in facts:
+            assert len(fact) < 500, f"Fact too long — probably raw turn: {fact[:100]}"
+
+    def test_core_memory_block_exists(self, tmp_db):
+        """After storing, a core memory block should exist for the user."""
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        core = strategy._get_core(USER)
+        assert core, "Core memory block should not be empty after storing facts"
+        assert "Jordan" in core or "Meridian" in core
+
+    def test_clear_removes_all(self, tmp_db):
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+        strategy.clear(USER)
+
+        memory = strategy.retrieve(USER, "What is my name?")
+        assert memory == ""
+
+    def test_user_isolation(self, tmp_db):
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        other_memory = strategy.retrieve("other_user", "What is my name?")
+        assert other_memory == ""
+
+    def test_retrieve_has_both_sections(self, tmp_db):
+        """Retrieve output should contain both core memory and relevant facts."""
+        strategy = AgenticMemory(db_path=tmp_db)
+        _run_session_1_agentic(strategy, USER, MODEL)
+
+        memory = strategy.retrieve(USER, "Tell me about Jordan's team")
+        assert "Core Memory" in memory
+        assert "Relevant Facts" in memory

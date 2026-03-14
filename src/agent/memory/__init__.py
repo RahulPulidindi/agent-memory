@@ -1,3 +1,4 @@
+from agent.memory.agentic import AgenticMemory
 from agent.memory.base import MemoryStrategy, NoMemory
 from agent.memory.history import FullHistoryMemory
 from agent.memory.semantic import SemanticMemory
@@ -11,6 +12,7 @@ def get_memory_strategy(name: str, **kwargs) -> MemoryStrategy:
         "history": FullHistoryMemory,
         "summary": SummaryMemory,
         "semantic": SemanticMemory,
+        "agentic": AgenticMemory,
     }
     if name not in strategies:
         raise ValueError(f"Unknown memory strategy '{name}'. Choose from: {list(strategies)}")
@@ -23,5 +25,6 @@ __all__ = [
     "FullHistoryMemory",
     "SummaryMemory",
     "SemanticMemory",
+    "AgenticMemory",
     "get_memory_strategy",
 ]

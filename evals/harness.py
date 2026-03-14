@@ -239,7 +239,7 @@ class StrategyResult:
 # Harness runner
 # ---------------------------------------------------------------------------
 
-STRATEGIES = ["none", "history", "summary", "semantic"]
+STRATEGIES = ["none", "history", "summary", "semantic", "agentic"]
 CHAT_MODEL = "anthropic:claude-haiku-4-5-20251001"
 JUDGE_MODEL = "anthropic:claude-haiku-4-5-20251001"
 USER_ID = "harness_user"
@@ -297,6 +297,10 @@ def _run_accumulation_session(turns: list[str], strategy, model_str: str) -> Non
             {"role": "user", "content": turn},
             {"role": "assistant", "content": ai_content},
         ])
+    # AgenticMemory updates core memory asynchronously — wait for it to finish
+    # before starting the next session so the core block is ready for retrieval.
+    if hasattr(strategy, "wait_for_core_update"):
+        strategy.wait_for_core_update()
 
 
 def run_recall_session(
